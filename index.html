@@ -1,0 +1,204 @@
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Test</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <div class="wrapper">
+            <div id="quest">
+                <div class="start_screen">
+                    <button onclick="quest.start()">Начать Тест</button>
+                </div>
+            </div>     
+        </div>
+    </body>
+</html>
+<script>
+    function Quest(data){
+        const self = this;
+        let questions = [];
+        let defaults = {};
+        let curQuestion = 0;
+        let elem = null;
+        let screens = {};
+        let log = {};
+
+        const init = (data) => {
+            elem = document.getElementById("quest");
+            
+            if (data.questions == undefined || data.questions.length === 0){
+                console.error("Данные пустые или колличество вопросов 0");
+                return;
+            } else {
+                questions = data.questions;
+                if (data.defaults == undefined){
+                    console.error("Default значения не установлены");
+                } else {
+                    defaults = data.defaults;
+                }
+            }
+            screens = data.screens;
+        };
+
+        const setQuestionScreen = ()=>{
+            console.log(elem);
+            elem.innerHTML = `<div class="screen">
+                    ${getQuestionHTML(questions[curQuestion])}
+                </div>`;
+            elem.querySelector(".answers").addEventListener("click", answerClickHandler);
+        }
+
+        const showButton = (answerNum)=>{
+            let buttonElem = elem.querySelector("button");
+            if(questions[curQuestion].answers[answerNum].onClick !== undefined){
+                buttonElem.onclick = ()=>questions[curQuestion].answers[answerNum].onClick(self);
+            } else {
+                buttonElem.onclick = ()=>defaults.answer.onClick(self);
+            }
+            buttonElem.removeAttribute("disabled");
+        }
+
+        const answerClickHandler = (event) => {
+            let target = event.target;
+            let value;
+
+            while(target.className !== "answers"){
+                if(target.className == "answers_item"){
+                    let radioBtn = target.querySelector('input[type="radio"]');
+                    value = radioBtn.value;
+                    showButton(parseInt(value));
+                }
+                target = target.parentNode;
+            }
+        }
+
+        const getQuestionHTML = (question)=>{
+            let className = "";
+            let questionHTML = "";
+            let questionTitle = question.title;
+            
+            className = question.className;
+            if (className == undefined)
+                className = defaults.question.className;
+            
+            questionHTML = `<div class="${className}">
+                    <span class="question_text">${questionTitle}</span>
+                </div>
+                ${getAnswersHTML(question.answers)}`;
+            return (questionHTML);
+        }
+
+        const getAnswersHTML = (answers) =>{
+            let className = "";
+
+            let answersHTML = `<div class="answers">
+                    <ul class="answers_list">`;
+            for (let i = 0; i < answers.length; i++){
+                className = answers[i].className;
+                if (answers[i].className == undefined)
+                    className = defaults.answer.className;
+                
+                answersHTML +=
+                    `<li class="answers_item">
+                        <label for="quest_${curQuestion}_${i}" class="${className}">${answers[i].title}</label>
+                        <input type="radio" name="quest_${curQuestion}" id="quest_${curQuestion}_${i}" value="${i}">
+                    </li>`;
+            }
+            answersHTML += 
+                    `</ul>
+                </div>
+                <div class="quest_button">
+                    <button type="button" disabled>Ответить</button>
+                </div>`
+            return (answersHTML);
+        }
+
+
+
+        self.start = ()=>{
+            init(data);
+            setQuestionScreen();
+        };
+
+        self.next = ()=>{
+            elem.querySelector(".answers").removeEventListener("click", answerClickHandler);
+            curQuestion++;
+            if (curQuestion > (questions.length - 1)){
+                self.show("finish");
+            } else {
+                setQuestionScreen();
+            }
+        }
+
+        self.show = (screen_type)=>{
+            if(screen_type=="fail"){
+                console.log("fail");
+                // elem.innerHtml = "";
+            }
+
+            if(screen_type=="finish"){
+                console.log("finish");
+            }
+        };
+    };
+    const model = {
+        defaults: {
+            question: {
+                className: 'question',
+            },
+            answer: {
+                className: 'answer',
+                onClick: quest => quest.next(),
+            },
+            screen: {
+                className: 'screen'
+            }
+        },
+        questions: [
+            {
+                title: 'выберите лишнее',
+                answers: [
+                    { title: 'mac os' },
+                    { title: 'windows' },
+                    { title: 'linux' },
+                ]
+            },
+            {
+                title: 'пробелы или табуляция?',
+                answers: [
+                    { title: 'два пробела' },
+                    { title: 'четыре пробела' },
+                    {
+                        title: 'табуляция',
+                        onClick: quest => quest.show('fail'),
+                    },
+                ]
+            },
+            {
+                title: 'История это',
+                className: 'question trollface',
+                answers: [
+                    {
+                        title: 'наука',
+                        onClick: quest => quest.show('fail'),
+                    },
+                    { title: 'не наука' }
+                ]
+            }
+        ],
+        screens: {
+            finish: {
+                className: 'screen success',
+                title: 'Прекрасно, вы прошли наше задание'
+            },
+            fail: {
+                className: 'screen fail',
+                title: 'Извините, вы ошиблись'
+            },
+        }
+    };
+
+    let quest = new Quest(model);
+
+</script>
