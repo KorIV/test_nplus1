@@ -5,10 +5,16 @@
         <link rel="stylesheet" href="style.css">
     </head>
     <body>
-        <div class="wrapper">
+        <div class="quest_wrapper">
             <div id="quest">
                 <div class="start_screen">
-                    <button onclick="quest.start()">Начать Тест</button>
+                    <div class="card-front">
+                        <div class="logo">
+                            <h2 class="initial">?</h2>
+                        </div>
+                        <div class="oval"></div>
+                        <button onclick="quest.start()" class="start_btn">Начать Тест</button>
+                    </div>
                 </div>
             </div>     
         </div>
@@ -20,9 +26,12 @@
         let questions = [];
         let defaults = {};
         let curQuestion = 0;
+        let curAnswer = -1;
         let elem = null;
         let screens = {};
-        let log = {};
+        let log = {
+            results:[]
+        };
 
         const init = (data) => {
             elem = document.getElementById("quest");
@@ -41,16 +50,31 @@
             screens = data.screens;
         };
 
-        const setQuestionScreen = ()=>{
-            console.log(elem);
-            elem.innerHTML = `<div class="screen">
-                    ${getQuestionHTML(questions[curQuestion])}
-                </div>`;
+        const setQuestionScreen = async()=>{
+            elem.innerHTML = `<div class="screen"></div>`;
+            await setQuestionHTML(questions[curQuestion]);
+            await setAnswersHTML(questions[curQuestion].answers);
+            setQNumberHTML();
             elem.querySelector(".answers").addEventListener("click", answerClickHandler);
         }
 
-        const showButton = (answerNum)=>{
-            let buttonElem = elem.querySelector("button");
+        const setQNumberHTML=()=>{
+            let qNumberHTML = document.createElement('div');
+            qNumberHTML.classList.add('question_number')
+            qNumberHTML.innerHTML = `<span class="question_number">${(curQuestion+1)}/${questions.length}</span>`;
+            elem.firstChild.appendChild(qNumberHTML);
+        }
+
+        const setButton = ()=>{
+            let buttonElem = document.createElement('div');
+
+            buttonElem.innerHTML = '<button type="button" disabled>Ответить</button>'
+
+            elem.firstChild.appendChild(buttonElem); //screen
+            return buttonElem.firstChild;
+        }
+
+        const setButtonAction = (buttonElem, answerNum)=>{
             if(questions[curQuestion].answers[answerNum].onClick !== undefined){
                 buttonElem.onclick = ()=>questions[curQuestion].answers[answerNum].onClick(self);
             } else {
@@ -58,63 +82,77 @@
             }
             buttonElem.removeAttribute("disabled");
         }
-
         const answerClickHandler = (event) => {
+            console.log("inside Handler")
             let target = event.target;
-            let value;
+            let buttonElem = elem.querySelector('button');
+            let activeAnswer = elem.querySelector('.active');
 
-            while(target.className !== "answers"){
-                if(target.className == "answers_item"){
-                    let radioBtn = target.querySelector('input[type="radio"]');
-                    value = radioBtn.value;
-                    showButton(parseInt(value));
+                while(target.className !== "answers"){
+                    if(target.className.includes("answer")){
+                        if(activeAnswer !== target.firstChild){// if not the same element
+                            if(activeAnswer) // if there is no 'active' element
+                                activeAnswer.classList.remove('active');
+                            target.firstChild.classList.add("active");
+                            if(curAnswer == (-1))
+                                buttonElem = setButton();
+                            curAnswer = parseInt(target.getAttribute("value"));
+                            setButtonAction(buttonElem, curAnswer);
+                        }
+                    }
+                    target = target.parentNode;
                 }
-                target = target.parentNode;
-            }
         }
 
-        const getQuestionHTML = (question)=>{
+        const setQuestionHTML = async (question)=>{
             let className = "";
             let questionHTML = "";
             let questionTitle = question.title;
+            let questionElem = document.createElement('div');
             
             className = question.className;
             if (className == undefined)
                 className = defaults.question.className;
             
-            questionHTML = `<div class="${className}">
-                    <span class="question_text">${questionTitle}</span>
-                </div>
-                ${getAnswersHTML(question.answers)}`;
-            return (questionHTML);
+            questionElem.className = className;
+            questionElem.innerHTML = `<span class="question_text">${questionTitle}</span>`;
+            elem.firstChild.appendChild(questionElem);
+            await setTimeout(()=>questionElem.classList.add('show'), 600);
+            return;
         }
 
-        const getAnswersHTML = (answers) =>{
+        const setAnswersHTML = async (answers) =>{
             let className = "";
-
-            let answersHTML = `<div class="answers">
-                    <ul class="answers_list">`;
+            let answersRootElem = null;
+            
+            answersRootElem = document.createElement('div');
+            answersRootElem.classList.add('answers');
+            elem.firstChild.appendChild(answersRootElem);
             for (let i = 0; i < answers.length; i++){
                 className = answers[i].className;
                 if (answers[i].className == undefined)
                     className = defaults.answer.className;
-                
-                answersHTML +=
-                    `<li class="answers_item">
-                        <label for="quest_${curQuestion}_${i}" class="${className}">${answers[i].title}</label>
-                        <input type="radio" name="quest_${curQuestion}" id="quest_${curQuestion}_${i}" value="${i}">
-                    </li>`;
+
+                let answerElem = document.createElement('div');
+                answerElem.classList.add(className);
+                answerElem.setAttribute("value", i);
+                answerElem.innerHTML = `<p for="quest_${curQuestion}_${i}">${answers[i].title}</p>`;
+                answersRootElem.appendChild(answerElem);
+                await setTimeout(()=>answerElem.classList.add('show'), 800*(i+1));
             }
-            answersHTML += 
-                    `</ul>
-                </div>
-                <div class="quest_button">
-                    <button type="button" disabled>Ответить</button>
-                </div>`
-            return (answersHTML);
+            return;
         }
 
+        self.getLog = () => {
+            return log;
+        };
 
+        self.restart = () => {
+            curQuestion = 0;
+            curAnswer = -1;
+            log.results = [];
+            self.start();
+        }
 
         self.start = ()=>{
             init(data);
@@ -122,6 +160,11 @@
         };
 
         self.next = ()=>{
+            log.results.push({
+                "question":questions[curQuestion].title,
+                "answer":questions[curQuestion].answers[curAnswer].title,
+            });
+            curAnswer = -1;
             elem.querySelector(".answers").removeEventListener("click", answerClickHandler);
             curQuestion++;
             if (curQuestion > (questions.length - 1)){
@@ -134,12 +177,21 @@
         self.show = (screen_type)=>{
             if(screen_type=="fail"){
                 console.log("fail");
-                // elem.innerHtml = "";
+                elem.innerHTML = `<div class="${screens.fail.className}">
+                    <p>${screens.fail.title}</p>
+                    <button>Начать заново</button>
+                    </div>`;
             }
 
             if(screen_type=="finish"){
                 console.log("finish");
+                elem.innerHTML = `<div class="${screens.finish.className}">
+                    <p>${screens.finish.title}</p>
+                    <button>Начать заново</button>
+                    </div>`;
             }
+
+            elem.querySelector("button").onclick = self.restart;
         };
     };
     const model = {
